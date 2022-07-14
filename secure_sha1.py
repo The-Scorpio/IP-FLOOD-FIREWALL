@@ -1,19 +1,19 @@
 #!/usr/bin/python
-
+from netaddr import IPNetwork
 import os,time,argparse,socket,pprint
 from scapy.all import *
-import sys,StringIO
+import sys
 from datetime import datetime, time
 
-def querysniff(pkt): ##Passive sniff DNS
+def querysniff(pkt):
         if IP in pkt:
                 ip_src=pkt[IP].src
                 ip_dst=pkt[IP].dst
                 if pkt.haslayer(DNS) and pkt.getlayer(DNS).qr == 0:
-                        print "Source : "+str(ip_src) +" Destination: "+str(ip_dst) +"DNS Query for Domain "+pkt.getlayer(DNS).qd.qname
+                        print ("Source : "+str(ip_src) +" Destination: "+str(ip_dst) +"DNS Query for Domain "+pkt.getlayer(DNS).qd.qname)
 
 
-def queryguard(pkt): ##dnsguard module ... need to fix duplicate entries..
+def queryguard(pkt): 
         if IP in pkt:
                 ip_src=pkt[IP].src
                 ip_dst=pkt[IP].dst
@@ -24,28 +24,27 @@ def queryguard(pkt): ##dnsguard module ... need to fix duplicate entries..
                         for url in bannedlist:
                          os.popen("iptables -I FORWARD -p udp --dport 53 -m string --string '"+url+"' -j DROP")
                          if (url in domain):
-                                print ip_src+" is looking for a blocked domain ",domain
+                                print (ip_src+" is looking for a blocked domain ",domain)
                                 iplist=os.popen("host "+domain+" | grep 'has addr' | awk '{ print $4;}'").read().split()
                                 for ip in iplist:
                                                 os.popen("iptables -I FORWARD -d "+ip+" -j DROP")
-                                                print "Domain resolved and Blocked!!!"
-                                                print "IP Blocked: ",ip
+                                                print ("Domain resolved and Blocked!!!")
+                                                print ("IP Blocked: ",ip)
 
 
-def ipsniff(pkt): ##Passive sniff IP/Socket
+def ipsniff(pkt): 
         if IP in pkt:
                 ip_src=pkt[IP].src
                 ip_dst=pkt[IP].dst
                 ip_src_port=pkt[IP].sport
                 ip_dst_port=pkt[IP].dport
-                print "Source : "+str(ip_src) +":"+str(ip_src_port)+" Destination: "+str(ip_dst)+":"+str(ip_dst_port)
+                print ("Source : "+str(ip_src) +":"+str(ip_src_port)+" Destination: "+str(ip_dst)+":"+str(ip_dst_port))
 
-def arpsniff(pkt): #arp monitor
+def arpsniff(pkt): 
     if ARP in pkt and pkt[ARP].op in (1,2):
         return pkt.sprintf("%ARP.hwsrc% %ARP.psrc%")
 
-########################
-########################
+
 
 
 parser = argparse.ArgumentParser()
@@ -164,7 +163,7 @@ parser.add_argument('--deny', action='store', dest='denyrules', default="none", 
 parser.add_argument('--permit', action='store', dest='permitrules', default="none", help='Write permit rules')
 
 
-##Still alpha.. not implemented mitm firewall yet
+
 parser.add_argument('--spoof', action='store', default="none", dest='spoof', help='Force Firewall to all hosts even if not connected to our machine directly..\n Specify Default gateway')
 
 
@@ -177,20 +176,20 @@ results = parser.parse_args()
 
 
 
-if not(results.delay=="none"):  #use ./SDS -delay nope     to remove delay
+if not(results.delay=="none"):  
         if(results.delay=="nope"):
                 os.popen("tc qdisc del dev eth0 root")
         else:
                 delay=results.delay+"ms"
                 os.popen("tc qdisc add dev eth0 root netem delay "+delay)
-                print "Added a delay of "+delay
+                print ("Added a delay of "+delay)
 
 
 
-if not(results.timerange=="none"): #09:00,18:00
+if not(results.timerange=="none"): 
         interval=results.timerange
         interval=interval.split(",")
-        print "interval: "+interval
+        print ("interval: "+interval)
         time1=interval[0]
         time2=interval[1]
         timeout="-m time --timestart "+time1+" --timestop "+time2
@@ -199,9 +198,7 @@ else:
 
 
 
-if not(results.bancountry=="none"): ## Could take some time.. ip lists are big..contain all ip ranges of countries
-      ## example : italy - it ,pakistan - pk, russia - ru, united states - us ,
-      ## If you run iptables -L could take some minutes!!!
+if not(results.bancountry=="none"): 
       code=results.bancountry
       iplist=os.popen("curl  http://www.ipdeny.com/ipblocks/data/countries/"+code+".zone").read()
       iplist=iplist.split()
@@ -209,25 +206,24 @@ if not(results.bancountry=="none"): ## Could take some time.. ip lists are big..
         os.popen("iptables -I FORWARD -d "+ip+" -j DROP")
         os.popen("iptables -I INPUT -d "+ip+" -j DROP")
         os.popen("iptables -I OUTPUT -d "+ip+" -j DROP")
-        print ip+" DENIED"
+        print (ip+" DENIED")
 
 
-if not(results.showlogs=="none"): #  shows live packet logging
+if not(results.showlogs=="none"): 
       res=results.showlogs
-      if("dns" in res): ##
-        ## tail -f /var/log/syslog | grep WWW | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'
-        ## "parsed" logs to show only important info
-        print os.popen("""tail -n 100 /var/log/syslog | grep DNS | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'""").read()
+      if("dns" in res): 
+        
+        print (os.popen("""tail -n 100 /var/log/syslog | grep DNS | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'""").read())
 
       if("www" in res):
-        print os.popen("""tail -n 100 /var/log/syslog | grep WWW | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'""").read()
+        print (os.popen("""tail -n 100 /var/log/syslog | grep WWW | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'""").read())
 
       if("credentials" in res):
-         print os.popen("""tail -n 100 /var/log/syslog | grep -e USER -e PASSW | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'""").read()
+         print (os.popen("""tail -n 100 /var/log/syslog | grep -e USER -e PASSW | awk '{$5="  ";  $9="   ";  $10=""; $14="   "; $15=""; $17="  "; $18=""; $23="";  print $i }'""").read())
 
 
 
-if not(results.dnsguard=="none"): ##Runs for N minutes then adds deny rules to those resolved ip addresses
+if not(results.dnsguard=="none"): 
         urlfilter=results.dnsguard
         stdout = sys.stdout
         capturer = StringIO.StringIO()
@@ -235,67 +231,45 @@ if not(results.dnsguard=="none"): ##Runs for N minutes then adds deny rules to t
         sniff(iface="eth0",filter="port 53",prn=queryguard, store= 0,count=100)
         sys.stdout = stdout
         raw_dnslog= capturer.getvalue()
-        print raw_dnslog
-        print "\n\n"
-#        file=open("dnslog","w").write(raw_dnslog) Other method but not worth
-#       for line in raw_dnslog.split():
-#        with open(urlfilter,"r") as f:
-#          for line in f:
-#               linea=open("dnslog","r").readline()
-#               print linea
-#               parsedurl=os.popen("echo '"+linea+"' | awk '{print $10;}'").read()
-#               print parsedurl," PARSED"
-#               if line in parsedurl:
-#                       print "WARNING!! Someone made a DNS Query for a banned url\n"
-#                       print "Resolving address and updating firewall rules!!"
-#                       iplist=os.popen("host "+url+" | grep 'has addr' | awk '{ print $4;}'").read().split()[0]iplist=os.popen("host "+url+" | grep 'has addr' | awk '{ print $4;}'").read().split()[0]
-#
-#                       print iplist
-                        #for ip in iplist:
-                                #os.popen("iptables -I FORWARD -d "+ip+" -j DROP")
-                                #print ip," BANNED"
-                                #banning all resolved ips
-#       print " Post  for"
-               # if bannedurl in url --> ban iptables
-   #Source : 1.1.1.1 Destination: 2.2.2.2  DNS Query for Domain www.google.com
-#
-#Source : 192.168.1.250 Destination: 208.67.220.220DNS Query for Domain 246.188.161.108.in-addr.arpa.
+        print (raw_dnslog)
+        print ("\n\n")
 
 
 
-if(results.arpguard): # ARP Guard to ban arp spoof
+
+if(results.arpguard): 
         stdout = sys.stdout
         capturer = StringIO.StringIO()
         beginscan= datetime.now()
         sys.stdout = capturer
-        ### Start capturing output
+      
         sniff(prn=arpsniff, filter="arp", store=0,count=10)
         sys.stdout = stdout
-        ### Finished capturing output
+        
         raw_arplist= capturer.getvalue()
         finishscan = datetime.now()
-        print "Started at: ",beginscan
-        print "Finished at: ",finishscan
+        print ("Started at: ",beginscan)
+        print ("Finished at: ",finishscan)
         file=open("arplist","w").write(raw_arplist)
         times=os.popen("sort arplist | uniq --count | sort -nr").read().split()[0]
         seconds=str((finishscan - beginscan).seconds)
-        print "Found MAC Flooded for "+times+" times in "+seconds+" seconds"
+        print ("Found MAC Flooded for "+times+" times in "+seconds+" seconds")
         spoofedmac=os.popen("sort arplist | uniq --count | sort -nr | awk '{ print $2; }' | grep 1").read().split()
         spoofedmac=str(spoofedmac[0])
         if not(seconds>10 or times<5):
-                print "Attacker is: ",spoofedmac
+                print ("Attacker is: "),spoofedmac
                 os.popen("iptables -A INPUT -m mac --mac-source "+spoofedmac+" -j DROP")
                 os.popen("iptables -A FORWARD -m mac --mac-source "+spoofedmac+" -j DROP")
-                print "Banned "+spoofedmac+" from the network... ARP Spoof DETECTED!\n"
+                print ("Banned "+spoofedmac+" from the network... ARP Spoof DETECTED!\n")
                 os.popen("rm arplist")
         else:
-                print "None is doing MAC Flooding"
-                print "Most duplicate MAC is: ",spoofedmac
+                print ("None is doing MAC Flooding")
+                print ("Most duplicate MAC is: "),spoofedmac
 
 
 if not (results.trafflimit=="none"):
       tl=results.trafflimit
-      ## TODO :Control string error
+      ## TODO 
       os.popen("iptables -I INPUT -p tcp -m limit --limit "+tl+" "+timeout+" -j ACCEPT")
       os.popen("iptables -I OUTPUT -p tcp -m limit --limit "+tl+" "+timeout+" -j ACCEPT")
       os.popen("iptables -I FORWARD -p tcp -m limit --limit "+tl+" "+timeout+" -j ACCEPT")
@@ -305,65 +279,65 @@ if not (results.trafflimit=="none"):
 
 
 if not(results.loadpcap == "none"):
-                        print "Reading capture file and parsing ip addresses"
-                        print "Only ip addresses found on .pcap will be allowed to pass on this firewall"
+                        print ("Reading capture file and parsing ip addresses")
+                        print ("Only ip addresses found on .pcap will be allowed to pass on this firewall")
                         try:
                                 allowedIP=os.popen("""tshark  -o column.format:'"Source", "%s"' -r """+results.loadpcap+" |sort|uniq").read()
-                                print allowedIP
+                                print (allowedIP)
                                 for line in allowedIP.split():
                                         try:
                                                  socket.inet_aton(line)
-                                                 print "Loaded from pcap  ",line
+                                                 print ("Loaded from pcap  ",line)
                                                  os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp "+timeout+" -j ACCEPT")
                                         except:
-                                                print "This isn't an IP"
+                                                print ("This isn't an IP")
                                 os.popen("iptables -P FORWARD DROP")
                         except:
-                                print "Error Parsing capture"
+                                print ("Error Parsing capture")
 if not(results.blacklist =="none"):
                             blacklist=results.blacklist
                             try:
-                                f=open(blacklist,"r") #Open external file to see what sites can't pass our gateway
-                                filterlist=f.read()  # list based on keywords
-                                for line in filterlist.split(): #Apply URL Filterbased firewall
-                                        if(";" in line): # ignore line cuz its a comment
-                                                print "Ignore comment"
-                                        else:   # Execute filtering
+                                f=open(blacklist,"r") 
+                                filterlist=f.read()  
+                                for line in filterlist.split(): 
+                                        if(";" in line): 
+                                                print ("Ignore comment")
+                                        else: 
                                                 try:
                                                         socket.inet_aton(line)
-                                                        print "I'm an ipv4! ",line
-                                                        #if i'm here cuz line is an ipv4 address
+                                                        print ("I'm an ipv4! ",line)
+                                                      
                                                         os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp  -j DROP")
                                                         os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp  -j LOG --log-prefix 'BLACKLIST-SDS'")
-                                                except: # if i'm there cuz its not an ipv4 so a normal string
+                                                except: 
                                                         os.popen("iptables -I FORWARD -p tcp --match multiport --dports 80,443 -m string --string "+line+" --algo kmp -j DROP")
                                                         os.popen("iptables -I FORWARD -p udp --dport 53 -m string --string "+line+" --algo kmp -j DROP")
                                                         os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp -j LOG --log-prefix 'BLACKLIST-SDS'")
-                                                        print "added blacklist rule: ",line
+                                                        print ("added blacklist rule: ",line)
                             except:
-                                print "Can't load filter list"
+                                print ("Can't load filter list")
 if not(results.whitelist =="none"):
                             whitelist=results.whitelist
                             try:
-                                f=open(whitelist,"r") #Open external file to see what sites can pass our gateway
+                                f=open(whitelist,"r") 
                                 filterlist=f.read()
                                 for line in filterlist.split():
                                         if(";" in line):
-                                                print "Ignore comment"
+                                                print ("Ignore comment")
                                         else:
                                                 try:
                                                         socket.inet_aton(line)
-                                                        print "I'm an ipv4! ",line
-                                                        #if i'm here cuz line is an ipv4 address
+                                                        print ("I'm an ipv4! ",line)
+                                                
                                                         os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp "+timeout+" -j ACCEPT")
                                                         os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp -j LOG --log-prefix 'WHITELIST-SDS'")
-                                                except: # if i'm there cuz its not an ipv4 so a normal string
+                                                except: 
                                                         os.popen("iptables -I FORWARD -p tcp --match multiport --dports 80,443 -m string --string "+line+" --algo kmp "+timeout+" -j ACCEPT")
                                                         os.popen("iptables -I FORWARD -p udp --dport 53 -m string --string "+line+" --algo kmp "+timeout+" -j ACCEPT")
                                                         os.popen("iptables -I FORWARD -p ALL -m string --string  "+line+" --algo kmp -j LOG --log-prefix 'WHITELIST-SDS'")
-                                                        print "added whitelist rule: ",line
+                                                        print ("added whitelist rule: ",line)
                             except:
-                                print "Can't load filter list"
+                                print ("Can't load filter list")
 
 
 if not(results.nopolicy == "none"):
@@ -377,25 +351,24 @@ if not(results.yespolicy == "none"):
 
 
 
-if(results.log): #Full Logger.. then Grab data from syslog and save it into database( mysql)
+if(results.log):
     os.popen("iptables -I FORWARD -p all -j LOG --log-prefix 'GENERAL-LOG'")
-        #Start Logging every connection to /var/log/messages
+       
 
-    #Log also images on /tmp?
     os.popen("iptables -I FORWARD -p all -m string --string 'jpg' --algo kmp  -j LOG --log-prefix 'JPG-SDS'")
     os.popen("iptables -I FORWARD -p all -m string --string 'gif' --algo kmp  -j LOG --log-prefix 'GIF-SDS'")
     os.popen("iptables -I FORWARD -p all -m string --string 'png' --algo kmp  -j LOG --log-prefix 'PNG-SDS'")
     os.popen("iptables -I FORWARD -p all -m string --string 'mp4' --algo kmp  -j LOG --log-prefix 'MP4-SDS'")
-    #Log urls/web request
+
     os.popen("iptables -I FORWARD -p tcp -m multiport --dports 80,443 -j LOG --log-prefix 'WWW-SDS' ")
-    #Log DNS
+
     os.popen("iptables -I FORWARD -p udp --dport 53 -j LOG --log-prefix 'DNS-SDS'")
-    #Log credentials HTTP
+    
     os.popen("iptables -I FORWARD -p all -m string --string 'passw' --algo kmp -j LOG --log-prefix 'PASSWORD-SDS'")
     os.popen("iptables -I FORWARD -p all -m string --string 'user' --algo kmp  -j LOG --log-prefix 'USERNAME-SDS'")
 
 
-if(results.flush): #Restore iptables
+if(results.flush):
         os.popen("iptables-restore < /etc/iptables/rules.v4")
 
 
@@ -406,8 +379,6 @@ if not(results.captive== "none"):
         os.popen("iptables -P POSTROUTING DENY")
         os.popen("iptables -t nat -I PREROUTING -p tcp --dport 443 "+timeout+" -j DNAT --to-destination "+cpIP+":80")
         os.popen("iptables -t nat -I PREROUTING -p tcp --dport 80 "+timeout+" -j DNAT --to-destination "+cpIP+":80")
-        ###
-        #### Do Captive portal.. when registered allow user to browse internet or make policies to allow certain sites etc..
 
 if not(results.dnsre =="none"):
        dnsServer=results.dnsre
@@ -425,7 +396,7 @@ if(results.nodns):
 
 
 if not(results.icmpre == "none"):
-      print "Redirecting icmp!"
+      print ("Redirecting icmp!")
       fakedest=results.icmpre
       os.popen("iptables -t nat -I PREROUTING -p icmp --icmp-type echo-request "+timeout+" -j DNAT --to-destination "+fakedest)
 
@@ -436,12 +407,10 @@ if(results.noicmp):
 
 if(results.save):
         os.popen("iptables-save >> /etc/iptables/rules.v4")
-        print "Saved rules!"
+        print ("Saved rules!")
 
 if(results.rule):
-  print "Manual rules are being added!"
- #Read values from ARGS and send them directly to iptables
-#Static IP tables rules...
+  print ("Manual rules are being added!")
   permit=str(results.permitrules)
   deny=str(results.denyrules)
   if("icmp" in permit):
@@ -449,7 +418,7 @@ if(results.rule):
   elif("icmp" in deny):
         os.popen("iptables -I FORWARD -p icmp --icmp-type 8 "+timeout+" -j DROP")
 
-  print "using rules ",deny
+  print ("using rules ",deny)
   if("tcp" in deny):
 
       if("http" in deny):
@@ -471,7 +440,7 @@ if(results.rule):
       if("dns" in deny):
          os.popen("iptables -I FORWARD -p udp --dport 53 "+timeout+" -j DROP")
   ### PERMIT RULES
-  print "using rules ",permit
+  print ("using rules ",permit)
   if("tcp" in permit):
 
      if("http" in permit):
@@ -499,20 +468,18 @@ if(results.rule):
          os.popen("iptables -I FORWARD -p udp --dport 53 "+timeout+" -j ACCEPT")
 
 
-if not(results.spoof=="none"): #Works slowly(256 pings) but once has started all arpspoof jobs it's done
-        ipnet=results.spoof  # Example : 192.168.1.0/24 .
+if not(results.spoof=="none"): 
+        ipnet=results.spoof  
         iplist=os.popen("nmap -sP "+ipnet+" | grep 'Nmap scan' | awk '{ print $5; }'").read()
         iplist=iplist.split()
         dgip=os.popen("ip route show | grep 'default' | awk '{print $3}' ").read()
         dgip=dgip.split()[0]
-        print "Spoofing "+dgip+"\n\n"
+        print ("Spoofing "+dgip+"\n\n")
         for ip in iplist:
-                print ip
+                print (ip)
                 os.popen("nohup arpspoof -t "+ip+" "+dgip+" >/dev/null 2>&1 &")
 
-if not(results.loadproxy=="none"): ## ONLY HTTP & HTTPS
-                # Proxy should be (socket format or just ip)  example 192.168.1.1:3128 or 1.1.1.1
-                #can be an external proxy or local
+if not(results.loadproxy=="none"):
                 proxy=results.loadproxy
                 os.popen("iptables -t nat -A PREROUTING -m multiport -p tcp --dports 80,443 -j DNAT --to "+proxy)
                 os.popen("iptables -t nat -I FORWARD -d "+proxy+" -j ACCEPT")
@@ -522,4 +489,3 @@ if not(results.loadproxy=="none"): ## ONLY HTTP & HTTPS
 if(results.killmitm):
     os.popen("killall arpspoof")
     os.popen("killall tcpkill")
-
